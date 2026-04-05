@@ -63,11 +63,11 @@ def render():
 
     # Rewrite fetch calls to static JSON files
     # facilities?sido=X -> facilities_X.json
-    js_content = js_content.replace("`/api/facilities?sido=${state.currentSido}`", "`/api/facilities_${state.currentSido}.json`".replace("$", "${"))
+    js_content = js_content.replace("`/api/facilities?sido=${state.currentSido}`", " `api/facilities_${state.currentSido}.json` ".strip())
     # metrics?sido=X -> metrics_X.json
-    js_content = js_content.replace("`/api/metrics?sido=${state.currentSido}`", "`/api/metrics_${state.currentSido}.json`".replace("$", "${"))
+    js_content = js_content.replace("`/api/metrics?sido=${state.currentSido}`", " `api/metrics_${state.currentSido}.json` ".strip())
     # coords?sido=X -> coords_X.json
-    js_content = js_content.replace("`/api/coords?sido=${sido}`", "`/api/coords_${sido}.json`".replace("$", "${"))
+    js_content = js_content.replace("`/api/coords?sido=${sido}`", " `api/coords_${sido}.json` ".strip())
     # search?q=X (Hardcode common ones or just redirect to national)
     js_content = js_content.replace("`/api/search?q=${encodeURIComponent(query)}`", "`/api/latest-year.json`") # Mock
     

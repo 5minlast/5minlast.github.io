@@ -247,13 +247,13 @@ async function loadDashboard() {
 }
 
 async function fetchFacilities() {
-    const res = await fetch(`/api/facilities_${{state.currentSido}.json`);
+    const res = await fetch(`api/facilities_${state.currentSido}.json`);
     state.data.facilities = await res.json();
     document.getElementById('fac-count').innerText = `${state.data.facilities.length}개`;
 }
 
 async function fetchMetrics() {
-    const res = await fetch(`/api/metrics_${{state.currentSido}.json`);
+    const res = await fetch(`api/metrics_${state.currentSido}.json`);
     state.data.metrics = await res.json();
     updateStatCards();
 }
@@ -424,7 +424,7 @@ async function updateMapForSido(sido) {
         map.flyTo({ center: [127.5, 36.5], zoom: 7 });
         return;
     }
-    const res = await fetch(`/api/coords_${{sido}.json`);
+    const res = await fetch(`api/coords_${sido}.json`);
     const { coords } = await res.json();
     map.flyTo({ center: [coords[1], coords[0]], zoom: 11, duration: 1500 });
 }
