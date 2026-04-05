@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Save to youth | 지능형 청소년 안전망</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Remix Icons & Leaflet & Chart.js -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    
+    <!-- NAVER MAPS API (v3) with Panorama -->
+    <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId={{ NAVER_CLIENT_ID }}&submodules=panorama"></script>
+    
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-theme="dark">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo">Save to youth</div>
+            </div>
+
+            <div class="sidebar-label">📍 관심 지역 선택</div>
+            <select id="sido-select" class="custom-select">
+                <option value="전국">전국 안전 정보</option>
+                <option value="서울특별시">서울특별시</option>
+                <option value="경기도">경기도</option>
+                <option value="부산광역시">부산광역시</option>
+                <option value="대구광역시">대구광역시</option>
+                <option value="인천광역시">인천광역시</option>
+                <option value="광주광역시">광주광역시</option>
+                <option value="대전광역시">대전광역시</option>
+                <option value="울산광역시">울산광역시</option>
+            </select>
+
+            <div class="sidebar-label">🎨 테마 전환 | Theme</div>
+            <div class="theme-selector">
+                <button class="theme-btn theme-bench" onclick="setTheme('dark')" title="Bench"></button>
+                <button class="theme-btn theme-mint" onclick="setTheme('light')" title="Mint"></button>
+                <button class="theme-btn theme-peach" onclick="setTheme('peach')" title="Peach"></button>
+                <button class="theme-btn theme-blue" onclick="setTheme('blue')" title="Blue"></button>
+            </div>
+
+            <div class="sidebar-label">🌐 언어 | Language</div>
+            <div class="lang-selector">
+                <button class="lang-btn active" onclick="setLanguage('ko')" data-lang="ko">KR</button>
+                <button class="lang-btn" onclick="setLanguage('en')" data-lang="en">EN</button>
+            </div>
+
+            <div class="sidebar-label">메뉴 탐색</div>
+            <nav class="sidebar-nav">
+                <a class="nav-item active" data-target="home">
+                    <i class="ri-home-5-line"></i> 홈 대시보드
+                </a>
+                <a class="nav-item" data-target="map-view">
+                    <i class="ri-map-2-line"></i> 안전망 지도
+                </a>
+                <a class="nav-item" data-target="analysis">
+                    <i class="ri-pie-chart-line"></i> 지표 비교 분석
+                </a>
+                <a class="nav-item" data-target="prediction">
+                    <i class="ri-robot-line"></i> AI 예측 분석
+                </a>
+                <a class="nav-item" data-target="emergency">
+                    <i class="ri-alarm-warning-line"></i> 긴급 도움받기
+                </a>
+                <a class="nav-item" data-target="data-info">
+                    <i class="ri-file-list-3-line"></i> 데이터 설명
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="card mini-footer-card">
+                    <div class="sidebar-label">📊 실시간 상황</div>
+                    <div class="footer-stat">
+                        <span>안전 시설</span>
+                        <span id="fac-count" class="stat-highlight">--</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Area -->
+        <main class="main-area">
+            <div class="scroll-progress"></div>
+            <!-- Home Section -->
+            <section id="home" class="main-content section-pane active">
+                <div class="hero-content fadeIn">
+                    <span class="badge">SECURITY SYSTEM V3.0</span>
+                    <h1 class="hero-title">청소년을 위한<br><span class="text-accent">지능형 안전망</span></h1>
+                    <p class="hero-desc">전국 데이터 분석 기반의 차세대 세이프티 대시보드. 지금 바로 우리 지역의 안전 정보를 확인하세요.</p>
+                    <div class="hero-actions fadeIn" style="animation-delay: 0.4s">
+                        <button class="btn-hero primary btn-shimmer" onclick="navigateTo('map-view')">분석 지도 시작</button>
+                        <button class="btn-hero secondary" onclick="navigateTo('analysis')">데이터 분석</button>
+                    </div>
+                </div>
+
+                <div class="top-stats fadeIn" style="animation-delay: 0.6s">
+                    <div class="stat-card card-shine">
+                        <div class="stat-label">우울감 인지율 (평균)</div>
+                        <div class="stat-value" id="stat-depression">--</div>
+                    </div>
+                    <div class="stat-card card-shine">
+                        <div class="stat-label">스트레스 인지율 (평균)</div>
+                        <div class="stat-value" id="stat-stress">--</div>
+                    </div>
+                    <div class="stat-card card-shine">
+                        <div class="stat-label">긴급 상담</div>
+                        <div class="stat-value text-accent">☎ 1388</div>
+                    </div>
+                </div>
+
+                <!-- 사용자 유형별 바로가기 -->
+                <div class="sidebar-label" style="margin-top:3rem;">👤 사용자 유형별 바로가기</div>
+                <div class="user-type-grid">
+                    <div class="user-card" onclick="navigateTo('emergency')">
+                        <i class="ri-user-heart-line"></i>
+                        <div class="user-card-title">청소년</div>
+                        <div class="user-card-desc">내 주변 도움 기관 찾기, 위기 시 연락처</div>
+                    </div>
+                    <div class="user-card" onclick="navigateTo('analysis')">
+                        <i class="ri-parent-line"></i>
+                        <div class="user-card-title">학부모</div>
+                        <div class="user-card-desc">우리 지역 안전 지표, 지원 자원 확인</div>
+                    </div>
+                    <div class="user-card" onclick="navigateTo('data-info')">
+                        <i class="ri-team-line"></i>
+                        <div class="user-card-title">선생님</div>
+                        <div class="user-card-desc">지역 비교 통계, 데이터 기반 자료</div>
+                    </div>
+                </div>
+
+                <!-- 데이터 기준일 -->
+                <div class="data-timestamp" id="data-timestamp">
+                    📅 데이터 최신 기준일: <span id="latest-year-display">로딩 중...</span> | 출처: 질병관리청 청소년건강행태조사
+                </div>
+            </section>
+
+            <!-- Map Section -->
+            <section id="map-view" class="section-pane hidden">
+                <div class="map-wrapper">
+                    <div id="map"></div>
+                    <div class="map-controls">
+                        <div class="search-box">
+                            <input type="text" id="map-search" placeholder="지역구 검색 (예: 일산, 서울)..." onkeyup="if(event.key==='Enter') searchAddress()">
+                            <button onclick="searchAddress()"><i class="ri-search-line"></i></button>
+                        </div>
+                        <button onclick="toggle3D()" class="btn-map">3D 지도</button>
+                        <button onclick="zoomToKorea()" class="btn-map">전체보기</button>
+                        <span class="map-divider">|</span>
+                        <button class="layer-btn active" data-layer="청소년 수련시설" onclick="toggleLayer(this)">수련시설</button>
+                        <button class="layer-btn active" data-layer="청소년쉼터" onclick="toggleLayer(this)">쉼터</button>
+                        <button class="layer-btn active" data-layer="청소년상담복지센터" onclick="toggleLayer(this)">상담센터</button>
+                        <button class="layer-btn" data-layer="안전 교육구역" onclick="toggleLayer(this)">🏫 학교 보호구역</button>
+                        <span class="map-divider">|</span>
+                        <button class="layer-btn" id="btn-risk" onclick="toggleRiskLayer()">⚠️ 위험 지수(3D)</button>
+                        <span class="map-divider">|</span>
+                        <button class="layer-btn highlight" id="btn-safe-route" onclick="toggleRouteBox()">🛡️ 안전 경로</button>
+                        <button class="layer-btn accent" id="btn-report" onclick="openReportModal()">🚩 위험 지역 제보</button>
+                    </div>
+
+                    <!-- Safe Route Sidebar/Box -->
+                    <div id="route-box" class="side-panel hidden">
+                        <div class="panel-header">
+                            <h3>🛡️ 안전 경로 탐색</h3>
+                            <button onclick="toggleRouteBox()" class="btn-close"><i class="ri-close-line"></i></button>
+                        </div>
+                        <div class="panel-body">
+                            <div class="input-group">
+                                <label>출발지</label>
+                                <div class="flex-row">
+                                    <input type="text" id="route-start" placeholder="출발지 이름 (예: 서울역)">
+                                    <button class="btn-map mini" onclick="pickRoutePoint('start')"><i class="ri-map-pin-line"></i></button>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>도착지</label>
+                                <div class="flex-row">
+                                    <input type="text" id="route-end" placeholder="도착지 이름 (예: 강남역)">
+                                    <button class="btn-map mini" onclick="pickRoutePoint('end')"><i class="ri-map-pin-line"></i></button>
+                                </div>
+                            </div>
+                            <button class="btn-hero primary full" onclick="findSafeRoute()">경로 탐색 시작</button>
+                            <div id="route-result" class="route-info">
+                                <!-- Logic:
+                                const duration = (data.routes[0].duration / 60).toFixed(1);
+                                const distance = (data.routes[0].distance / 1000).toFixed(1);
+                                
+                                // --- School Zone Avoidance Check ---
+                                let avoidanceCheck = "";
+                                const points = data.routes[0].geometry.coordinates;
+                                const schools = [
+                                    { name: "도산 고등학교", lat: 37.5218, lon: 127.0360 },
+                                    { name: "청담 중학교", lat: 37.5250, lon: 127.0510 }
+                                ];
+
+                                let avoidedNames = [];
+                                schools.forEach(school => {
+                                    points.forEach(p => {
+                                        const dist = getDistance(p[1], p[0], school.lat, school.lon);
+                                        if (dist < 0.2 && !avoidedNames.includes(school.name)) {
+                                            avoidedNames.push(school.name);
+                                        }
+                                    });
+                                });
+
+                                if (avoidedNames.length > 0) {
+                                    avoidanceCheck = `
+                                    <div class="safety-reason fadeIn" style="background: rgba(255, 126, 51, 0.1); border-left: 4px solid #ff7e33; padding: 0.75rem; border-radius: 8px; margin-top: 1rem;">
+                                        <p style="color: #ff7e33; font-weight: 800; font-size: 0.85rem;">🛡️ 교육환경 보호구역 감지</p>
+                                        <p style="font-size: 0.82rem; margin-top: 0.25rem;">${avoidedNames.join(', ')} 주변 200m 상대보호구역을 통과하고 있습니다. 유해업소(기타 영업 시설) 노출에 주의하세요.</p>
+                                    </div>`;
+                                }
+
+                                document.getElementById('route-result').innerHTML = `
+                                    <div class="route-summary">
+                                        <p>📏 거리: ${distance} km</p>
+                                        <p>⏰ 시간: ${duration} 분 예상</p>
+                                        ${avoidanceCheck}
+                                    </div>
+                                    <button class="btn-hero primary mini full" style="margin-top:1rem" onclick="openNavGuide()">로드뷰 경로 안내 시작</button>
+                                `;
+                                -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Report Modal -->
+                    <div id="report-modal" class="modal-overlay hidden">
+                        <div class="modal-card">
+                            <div class="modal-header">
+                                <h3>🚩 위험 지역 제보</h3>
+                                <button onclick="closeReportModal()" class="btn-close"><i class="ri-close-line"></i></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="modal-desc">청소년이 주의해야 할 구역을 제보해주세요. 이 정보는 모든 사용자와 공유됩니다.</p>
+                                <div class="input-group">
+                                    <label>제목</label>
+                                    <input type="text" id="report-title" placeholder="예: 야간 가로등 부재 구역">
+                                </div>
+                                <div class="input-group">
+                                    <label>위치 (위도/경도)</label>
+                                    <div class="flex-row">
+                                        <input type="text" id="report-lat" placeholder="37.xxx" readonly>
+                                        <input type="text" id="report-lon" placeholder="127.xxx" readonly>
+                                        <button class="btn-map mini" onclick="pickFromMap()">지도 선택</button>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>위험 수준</label>
+                                    <select id="report-risk" class="custom-select">
+                                        <option value="1">Level 1 (주의)</option>
+                                        <option value="3">Level 3 (위험)</option>
+                                        <option value="5">Level 5 (심각)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>내용</label>
+                                    <textarea id="report-content" rows="3" placeholder="구체적인 상황을 적어주세요."></textarea>
+                                </div>
+                                <button class="btn-hero primary full" onclick="submitReport()">제보하기</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Naver Roadview / Navigation Guide Overlay -->
+                    <div id="nav-guide-overlay" class="modal-overlay hidden">
+                        <div class="modal-card wide">
+                            <div class="modal-header">
+                                <h3>🛡️ 세이프티 로드뷰 가이드</h3>
+                                <button onclick="closeNavGuide()" class="btn-close"><i class="ri-close-line"></i></button>
+                            </div>
+                            <div class="modal-body flex-row-layout">
+                                <div id="pano" class="pano-container"></div>
+                                <div class="step-guide-panel">
+                                    <div class="guide-meta">
+                                        <div id="guide-title" class="guide-title">안전 경로 안내 중...</div>
+                                        <div id="guide-dist" class="guide-dist">-- km</div>
+                                    </div>
+                                    <div id="turn-by-turn-list" class="step-list">
+                                        <!-- Steps injected here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 기관 리스트 뷰 -->
+                <div class="facility-list-panel" id="facility-list-panel">
+                    <div class="facility-list-header">
+                        <h3>📋 기관 목록 (<span id="facility-list-count">0</span>개)</h3>
+                        <button class="btn-map" onclick="toggleFacilityList()">목록 접기</button>
+                    </div>
+                    <div id="facility-list-body" class="facility-list-body"></div>
+                </div>
+                <button class="btn-show-list" id="btn-show-list" onclick="toggleFacilityList()">📋 기관 목록 보기</button>
+            </section>
+
+            <!-- Analysis Section -->
+            <section id="analysis" class="main-content section-pane hidden">
+                <h2 class="section-title">데이터 기반 지표 분석</h2>
+                <div class="dashboard-grid">
+                    <div class="card card-shine fadeIn">
+                        <div class="card-title">지역별 정신건강 지표 비교</div>
+                        <div class="chart-meta">단위: % | 기준연도: <span class="chart-year">--</span> | 출처: 청소년건강행태조사</div>
+                        <div class="chart-container">
+                            <canvas id="chart-metrics"></canvas>
+                        </div>
+                        <p id="analysis-interp" class="interpretation"></p>
+                    </div>
+                    <div class="card card-shine fadeIn">
+                        <div class="card-title">연도별 추이 분석</div>
+                        <div class="chart-meta">단위: % | 출처: 청소년건강행태조사</div>
+                        <div class="chart-container">
+                            <canvas id="chart-trends"></canvas>
+                        </div>
+                        <p id="trend-interp" class="interpretation">📌 지역 비교를 위한 참고 자료이며 단순 인과관계를 의미하지 않습니다.</p>
+                    </div>
+                </div>
+
+                <!-- 추가 차트: 학년별 비교 + 도넛 -->
+                <div class="dashboard-grid" style="margin-top: 2rem;">
+                    <div class="card">
+                        <div class="card-title">학년별 우울감 비교 (중1~고3)</div>
+                        <div class="chart-meta">단위: % | 기준연도: <span class="chart-year">--</span> | 출처: 청소년건강행태조사</div>
+                        <div class="chart-container">
+                            <canvas id="chart-grade"></canvas>
+                        </div>
+                        <p id="grade-interp" class="interpretation">📊 학년이 올라갈수록 우울감이 변화하는 양상을 보여줍니다. 조사 방식과 표본 특성을 고려해 해석해야 합니다.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">정신건강 지표 비중</div>
+                        <div class="chart-meta">전국 평균 기준 | 출처: 청소년건강행태조사</div>
+                        <div class="chart-container">
+                            <canvas id="chart-donut"></canvas>
+                        </div>
+                        <p id="donut-interp" class="interpretation">🔍 각 지표의 상대적 비중을 보여주며, 절대값 비교가 아닌 분포 이해를 위한 참고 자료입니다.</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="prediction" class="main-content section-pane hidden">
+                <div class="prediction-header fadeIn">
+                    <h2 class="section-title" data-i18n="pred_title">AI 정신건강 트렌드 예측</h2>
+                    <div class="prediction-controls card">
+                        <div class="control-group">
+                            <label data-i18n="label_indicator">지표 선택</label>
+                            <select id="pred-indicator" class="custom-select mini"></select>
+                        </div>
+                        <div class="control-group">
+                            <label data-i18n="label_region">지역 선택</label>
+                            <select id="pred-region" class="custom-select mini"></select>
+                        </div>
+                        <div class="control-group">
+                            <label data-i18n="label_horizon">예측 기간 (년)</label>
+                            <input type="range" id="pred-horizon" min="1" max="10" value="5" oninput="this.nextElementSibling.value = this.value">
+                            <output>5</output>
+                        </div>
+                        <div class="control-group">
+                            <label data-i18n="label_model">모델 선택</label>
+                            <div class="radio-group">
+                                <label><input type="radio" name="pred-model" value="LSTM" checked> LSTM</label>
+                                <label><input type="radio" name="pred-model" value="Linear Regression"> Linear</label>
+                            </div>
+                        </div>
+                        <button class="btn-hero primary mini" onclick="updatePrediction()" data-i18n="btn_analyze">분석 실행</button>
+                    </div>
+                </div>
+
+                <div class="prediction-stats-grid fadeIn">
+                    <div class="stat-card mini">
+                        <div class="stat-label" data-i18n="label_latest_val">최근 기록값</div>
+                        <div class="stat-value" id="pred-latest-views">--</div>
+                    </div>
+                    <div class="stat-card mini">
+                        <div class="stat-label" data-i18n="label_change">직전 대비 변화</div>
+                        <div class="stat-value" id="pred-change">--</div>
+                    </div>
+                    <div class="stat-card mini accent">
+                        <div class="stat-label" data-i18n="label_pred_final">AI 최종 예측값(n년후)</div>
+                        <div class="stat-value" id="pred-final-val">--</div>
+                    </div>
+                </div>
+
+                <div class="card prediction-card fadeIn" style="margin-top: 2rem;">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="switchPredTab(this, 'tab-pred-main')" data-i18n="tab_forecast">AI Forecast</button>
+                        <button class="tab-btn" onclick="switchPredTab(this, 'tab-pred-decompose')">Decomposition</button>
+                        <button class="tab-btn" onclick="switchPredTab(this, 'tab-pred-table')" data-i18n="tab_comparison">Comparison</button>
+                    </div>
+                    <div class="tab-content" id="tab-pred-main">
+                        <div class="chart-container pred-large">
+                            <canvas id="chart-prediction"></canvas>
+                        </div>
+                        <div id="pred-interp" class="interpretation fadeIn" style="margin-top:1rem; padding:1.5rem; background:rgba(255,255,255,0.02); border-radius:12px; border-left:4px solid var(--accent-primary)"></div>
+                        <div class="metrics-row fadeIn" id="pred-metrics-box"></div>
+                    </div>
+                    <div class="tab-content hidden" id="tab-pred-decompose">
+                        <div class="decompose-grid">
+                            <div class="decompose-item"><canvas id="chart-decomp-observed"></canvas></div>
+                            <div class="decompose-item"><canvas id="chart-decomp-trend"></canvas></div>
+                            <div class="decompose-item"><canvas id="chart-decomp-seasonal"></canvas></div>
+                            <div class="decompose-item"><canvas id="chart-decomp-resid"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="tab-content hidden" id="tab-pred-table">
+                        <div class="table-wrapper">
+                            <table class="data-table" id="pred-comp-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="th_date">연도</th>
+                                        <th data-i18n="th_actual">실제값</th>
+                                        <th data-i18n="th_pred">예측값</th>
+                                        <th data-i18n="th_error">오차</th>
+                                        <th data-i18n="th_error_pct">오차율(%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Emergency Section -->
+            <section id="emergency" class="main-content section-pane hidden">
+                <h2 class="section-title">긴급 도움받기</h2>
+                <div id="hotline-list" class="dashboard-grid">
+                    <!-- Hotlines inject here -->
+                </div>
+
+                <!-- 상황별 도움 안내 -->
+                <h3 class="sub-section-title">💬 상황별 도움 안내</h3>
+                <div class="situation-grid">
+                    <div class="situation-card">
+                        <div class="situation-icon">😢</div>
+                        <div class="situation-title">우울·불안</div>
+                        <div class="situation-desc">마음이 힘들거나 불안할 때, 전문 상담사가 24시간 함께합니다.</div>
+                        <a href="tel:1388" class="situation-cta">☎ 1388 전화하기</a>
+                    </div>
+                    <div class="situation-card">
+                        <div class="situation-icon">🏫</div>
+                        <div class="situation-title">학교 문제</div>
+                        <div class="situation-desc">학교폭력, 따돌림, 학업 스트레스 관련 도움을 받을 수 있습니다.</div>
+                        <a href="tel:117" class="situation-cta">☎ 117 안전드림</a>
+                    </div>
+                    <div class="situation-card">
+                        <div class="situation-icon">🚨</div>
+                        <div class="situation-title">폭력·괴롭힘</div>
+                        <div class="situation-desc">신체적·정신적 폭력 상황에서 긴급 지원을 받으세요.</div>
+                        <a href="tel:112" class="situation-cta">☎ 112 긴급 신고</a>
+                    </div>
+                    <div class="situation-card">
+                        <div class="situation-icon">🏠</div>
+                        <div class="situation-title">가출·가정 문제</div>
+                        <div class="situation-desc">가정 내 어려움이 있을 때, 쉼터와 상담을 연결해 드립니다.</div>
+                        <a href="tel:1388" class="situation-cta">☎ 1388 쉼터 연결</a>
+                    </div>
+                    <div class="situation-card">
+                        <div class="situation-icon">🎯</div>
+                        <div class="situation-title">진로·생활 고민</div>
+                        <div class="situation-desc">진로, 취업, 일상 생활 고민을 함께 나눌 수 있습니다.</div>
+                        <a href="tel:1388" class="situation-cta">☎ 1388 상담하기</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Info / 팩트체크 Section -->
+            <section id="data-info" class="main-content section-pane hidden">
+                <h2 class="section-title">데이터 설명 · 팩트체크</h2>
+                <div class="info-notice">
+                    <i class="ri-information-line"></i>
+                    본 서비스의 모든 데이터는 공공기관 공식 통계를 기반으로 하며, 지역 비교를 위한 참고 자료입니다.
+                </div>
+                <div id="data-info-list" class="data-info-grid">
+                    <!-- Data info cards injected here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Mapbox Token -->
+    <script>const MAPBOX_TOKEN = "{{ MAPBOX_TOKEN }}";</script>
+    <!-- Application Script -->
+    <!-- Premium Chart Tooltip -->
+    <div id="chart-tooltip-custom"></div>
+
+    <script src="/static/app.js?v=3.0"></script>
+</body>
+</html>

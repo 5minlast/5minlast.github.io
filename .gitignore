@@ -1,0 +1,16 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+node_modules/
+dist/
+build/
+.DS_Store
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+# Keep data files if they are small, but ignore large ones if any
+# For now, let's just ignore common artifacts

@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pandas
+numpy
+requests
+python-multipart
+python-dotenv
+jinja2
+geopandas
+shapely
+scikit-learn
+statsmodels
+torch
+firebase-admin
+httpx
