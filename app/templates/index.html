@@ -174,63 +174,59 @@
                             <h3>🛡️ 안전 경로 탐색</h3>
                             <button onclick="toggleRouteBox()" class="btn-close"><i class="ri-close-line"></i></button>
                         </div>
-                        <div class="panel-body">
+                        <div class="panel-body" style="overflow-y:auto; max-height: calc(100vh - 160px);">
+
+                            <!-- 이동 수단 탭 -->
+                            <div class="transport-tabs" style="display:flex; gap:0.5rem; margin-bottom:1.25rem;">
+                                <button id="tab-walk" class="transport-tab active" onclick="setTransportMode('walking')" title="도보">
+                                    <i class="ri-walk-line"></i> 도보
+                                </button>
+                                <button id="tab-transit" class="transport-tab" onclick="setTransportMode('driving-traffic')" title="대중교통">
+                                    <i class="ri-bus-line"></i> 대중교통
+                                </button>
+                                <button id="tab-car" class="transport-tab" onclick="setTransportMode('driving')" title="자동차">
+                                    <i class="ri-car-line"></i> 자동차
+                                </button>
+                            </div>
+
+                            <!-- 출발지 -->
                             <div class="input-group">
-                                <label>출발지</label>
+                                <label>📍 출발지</label>
+                                <div class="route-input-hint">예: 서울역, 강남역, 홍대입구역</div>
                                 <div class="flex-row">
-                                    <input type="text" id="route-start" placeholder="출발지 이름 (예: 서울역)">
-                                    <button class="btn-map mini" onclick="pickRoutePoint('start')"><i class="ri-map-pin-line"></i></button>
+                                    <input type="text" id="route-start" placeholder="장소명 또는 주소 입력" autocomplete="off">
+                                    <button class="btn-map mini" onclick="pickRoutePoint('start')" title="지도에서 위치 선택">
+                                        <i class="ri-map-pin-add-line"></i>
+                                    </button>
+                                </div>
+                                <div id="start-adjust-hint" class="adjust-hint hidden">
+                                    📌 <span id="start-adjust-addr">위치 설정됨</span>
+                                    <button class="tiny-btn" onclick="pickRoutePoint('start')">재조정</button>
                                 </div>
                             </div>
+
+                            <!-- 도착지 -->
                             <div class="input-group">
-                                <label>도착지</label>
+                                <label>🏁 도착지</label>
+                                <div class="route-input-hint">예: 이태원, 잠실종합운동장, OO중학교</div>
                                 <div class="flex-row">
-                                    <input type="text" id="route-end" placeholder="도착지 이름 (예: 강남역)">
-                                    <button class="btn-map mini" onclick="pickRoutePoint('end')"><i class="ri-map-pin-line"></i></button>
+                                    <input type="text" id="route-end" placeholder="장소명 또는 주소 입력" autocomplete="off">
+                                    <button class="btn-map mini" onclick="pickRoutePoint('end')" title="지도에서 위치 선택">
+                                        <i class="ri-map-pin-add-line"></i>
+                                    </button>
+                                </div>
+                                <div id="end-adjust-hint" class="adjust-hint hidden">
+                                    📌 <span id="end-adjust-addr">위치 설정됨</span>
+                                    <button class="tiny-btn" onclick="pickRoutePoint('end')">재조정</button>
                                 </div>
                             </div>
-                            <button class="btn-hero primary full" onclick="findSafeRoute()">경로 탐색 시작</button>
-                            <div id="route-result" class="route-info">
-                                <!-- Logic:
-                                const duration = (data.routes[0].duration / 60).toFixed(1);
-                                const distance = (data.routes[0].distance / 1000).toFixed(1);
-                                
-                                // --- School Zone Avoidance Check ---
-                                let avoidanceCheck = "";
-                                const points = data.routes[0].geometry.coordinates;
-                                const schools = [
-                                    { name: "도산 고등학교", lat: 37.5218, lon: 127.0360 },
-                                    { name: "청담 중학교", lat: 37.5250, lon: 127.0510 }
-                                ];
 
-                                let avoidedNames = [];
-                                schools.forEach(school => {
-                                    points.forEach(p => {
-                                        const dist = getDistance(p[1], p[0], school.lat, school.lon);
-                                        if (dist < 0.2 && !avoidedNames.includes(school.name)) {
-                                            avoidedNames.push(school.name);
-                                        }
-                                    });
-                                });
+                            <button class="btn-hero primary full" onclick="findSafeRoute()" style="margin-bottom:1rem;">
+                                <i class="ri-route-line"></i> 안전 경로 탐색
+                            </button>
 
-                                if (avoidedNames.length > 0) {
-                                    avoidanceCheck = `
-                                    <div class="safety-reason fadeIn" style="background: rgba(255, 126, 51, 0.1); border-left: 4px solid #ff7e33; padding: 0.75rem; border-radius: 8px; margin-top: 1rem;">
-                                        <p style="color: #ff7e33; font-weight: 800; font-size: 0.85rem;">🛡️ 교육환경 보호구역 감지</p>
-                                        <p style="font-size: 0.82rem; margin-top: 0.25rem;">${avoidedNames.join(', ')} 주변 200m 상대보호구역을 통과하고 있습니다. 유해업소(기타 영업 시설) 노출에 주의하세요.</p>
-                                    </div>`;
-                                }
-
-                                document.getElementById('route-result').innerHTML = `
-                                    <div class="route-summary">
-                                        <p>📏 거리: ${distance} km</p>
-                                        <p>⏰ 시간: ${duration} 분 예상</p>
-                                        ${avoidanceCheck}
-                                    </div>
-                                    <button class="btn-hero primary mini full" style="margin-top:1rem" onclick="openNavGuide()">로드뷰 경로 안내 시작</button>
-                                `;
-                                -->
-                            </div>
+                            <!-- 결과 영역 -->
+                            <div id="route-result"></div>
                         </div>
                     </div>
 
