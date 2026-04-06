@@ -264,7 +264,7 @@ async function fetchTrends() {
 }
 
 async function fetchHotlines() {
-    const res = await fetch('api/hotlines');
+    const res = await fetch('api/hotlines.json');
     state.data.hotlines = await res.json();
 }
 
@@ -618,19 +618,19 @@ function toggle3D() { map.easeTo({ pitch: 60, bearing: -20, zoom: 16, duration: 
 let chartGrade; let chartDonut;
 
 async function fetchGradeMetrics() {
-    const res = await fetch('api/metrics-by-grade?indicator=우울감');
+    const res = await fetch('api/metrics-by-grade_우울감.json');
     state.data.gradeMetrics = await res.json();
 }
 async function fetchIndicatorSummary() {
-    const res = await fetch('api/indicator-summary');
+    const res = await fetch('api/indicator-summary.json');
     state.data.indicatorSummary = await res.json();
 }
 async function fetchDataInfo() {
-    const res = await fetch('api/data-info');
+    const res = await fetch('api/data-info.json');
     state.data.dataInfo = await res.json();
 }
 async function fetchLatestYear() {
-    const res = await fetch('api/latest-year');
+    const res = await fetch('api/latest-year.json');
     const d = await res.json();
     document.querySelectorAll('.chart-year').forEach(el => el.innerText = d.year);
     
@@ -764,7 +764,7 @@ function renderDataInfo() {
 async function searchAddress() {
     const query = document.getElementById('map-search').value;
     if (!query) return;
-    const res = await fetch(`/api/latest-year.json`);
+    const res = await fetch('api/latest-year.json');
     const { coords } = await res.json();
     map.flyTo({ center: [coords[1], coords[0]], zoom: 12, pitch: 45 });
 }
@@ -780,12 +780,14 @@ window.switchPredTab = switchPredTab;
 
 // Extend navigateTo to handle prediction section initialization
 const _originalNavigateTo = navigateTo;
-navigateTo = function(targetId) {
+const patchedNavigateTo = function(targetId) {
     _originalNavigateTo(targetId);
     if (targetId === 'prediction') {
         initPrediction();
     }
 };
+navigateTo = patchedNavigateTo;
+window.navigateTo = patchedNavigateTo;
 
 async function initPrediction() {
     console.log("Initializing Mental Health Prediction...");
@@ -795,18 +797,25 @@ async function initPrediction() {
     if (indicatorSelect.children.length === 0) {
         try {
             const [indicators, regions] = await Promise.all([
-                fetch('api/prediction/indicators').then(res => res.json()),
-                fetch('api/prediction/regions').then(res => res.json())
+                fetch('api/prediction/indicators.json').then(res => res.json()),
+                fetch('api/prediction/regions.json').then(res => res.json())
             ]);
             
             indicatorSelect.innerHTML = indicators.map(i => `<option value="${i}">${i}</option>`).join('');
             regionSelect.innerHTML = regions.map(r => `<option value="${r}">${r}</option>`).join('');
             
+            // Add automatic update listeners (FIX: "category not working" if no listeners)
+            indicatorSelect.addEventListener('change', updatePrediction);
+            regionSelect.addEventListener('change', updatePrediction);
+            document.getElementById('pred-horizon').addEventListener('change', updatePrediction);
+            document.querySelectorAll('input[name="pred-model"]').forEach(r => r.addEventListener('change', updatePrediction));
+
             // Trigger first load
             updatePrediction();
         } catch(e) { console.error("Failed to initialize prediction selects", e); }
     }
 }
+
 
 async function updatePrediction() {
     const indicator = document.getElementById('pred-indicator').value;
@@ -819,7 +828,7 @@ async function updatePrediction() {
     btn.disabled = true;
 
     try {
-        const res = await fetch(`/api/prediction/data?indicator=${encodeURIComponent(indicator)}&region=${encodeURIComponent(region)}&forecast_years=${horizon}&model_type=${model}`);
+        const res = await fetch(`/api/prediction/data?indicator=${indicator}&region=${region}&forecast_years=${horizon}&model_type=${model}`);
         const data = await res.json();
         
         if (data.error) {
@@ -978,7 +987,7 @@ function renderPredictionChart(data, modelName) {
 
 async function fetchDecomposition(indicator, region) {
     try {
-        const res = await fetch(`/api/prediction/decompose?indicator=${encodeURIComponent(indicator)}&region=${encodeURIComponent(region)}`);
+        const res = await fetch(`/api/prediction/decompose?indicator=${indicator}&region=${region}`);
         const data = await res.json();
         if (data.error) return;
         
@@ -1049,7 +1058,7 @@ async function toggleRiskLayer() {
         return;
     }
 
-    const res = await fetch('api/risk-zones');
+    const res = await fetch('api/latest-year.json');
     const points = await res.json();
     renderRiskPoints(points);
 }
@@ -1160,7 +1169,7 @@ async function handleRoutePick(e) {
 }
 
 async function checkPointDanger(lat, lon, label) {
-    const res = await fetch('api/risk-zones');
+    const res = await fetch('api/latest-year.json');
     const riskZones = await res.json();
     
     // Find closest risk zone
@@ -1201,7 +1210,7 @@ async function submitReport() {
         return;
     }
 
-    const res = await fetch('api/report', {
+    const res = await fetch('/api/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(report)

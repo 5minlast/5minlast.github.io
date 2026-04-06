@@ -1,6 +1,7 @@
 import os
 import json
 import shutil
+import re
 from fastapi.testclient import TestClient
 from dotenv import load_dotenv
 
@@ -11,19 +12,30 @@ load_dotenv()
 
 client = TestClient(app)
 
+# All indicators and regions to pre-compute
+INDICATORS = ["스트레스", "우울감", "자살시도"]
+REGIONS = list(SIDO_MAP.keys())
+MODELS = ["LSTM", "Linear Regression"]
+FORECAST_YEARS = 5
+
+
+def safe_filename(text: str) -> str:
+    """Convert Korean text to a safe filename."""
+    return text.replace(" ", "_")
+
+
 def render():
     print("🚀 Starting static site generation...")
     
     # 1. Prepare directories
-    # We will use the current directory as the target (root of the repo)
-    # but let's be careful not to delete source folders.
-    target_dir = "." # root
+    target_dir = "."
     static_target = os.path.join(target_dir, "static")
     api_target = os.path.join(target_dir, "api")
+    pred_target = os.path.join(api_target, "prediction")
     
     os.makedirs(static_target, exist_ok=True)
     os.makedirs(api_target, exist_ok=True)
-    os.makedirs(os.path.join(api_target, "prediction"), exist_ok=True)
+    os.makedirs(pred_target, exist_ok=True)
 
     # 2. Render index.html
     print("--- Rendering index.html ---")
@@ -47,8 +59,9 @@ def render():
         
         with open(os.path.join(target_dir, "index.html"), "w", encoding="utf-8") as f:
             f.write(html_content)
+        print("  ✓ index.html rendered")
     else:
-        print(f"Error rendering index: {response.status_code}")
+        print(f"  ✗ Error rendering index: {response.status_code}")
 
     # 3. Copy/Modify Static files
     print("--- Copying and modifying static files ---")
@@ -56,43 +69,67 @@ def render():
     
     # Style.css
     shutil.copy(os.path.join(source_static, "style.css"), os.path.join(static_target, "style.css"))
+    print("  ✓ style.css copied")
     
-    # App.js (Rewrite API calls)
+    # App.js (Rewrite API calls for static hosting)
     with open(os.path.join(source_static, "app.js"), "r", encoding="utf-8") as f:
         js_content = f.read()
 
-    # Rewrite fetch calls to static JSON files
-    # facilities?sido=X -> facilities_X.json
-    js_content = js_content.replace("`/api/facilities?sido=${state.currentSido}`", " `api/facilities_${state.currentSido}.json` ".strip())
-    # metrics?sido=X -> metrics_X.json
-    js_content = js_content.replace("`/api/metrics?sido=${state.currentSido}`", " `api/metrics_${state.currentSido}.json` ".strip())
-    # coords?sido=X -> coords_X.json
-    js_content = js_content.replace("`/api/coords?sido=${sido}`", " `api/coords_${sido}.json` ".strip())
-    # search?q=X (Hardcode common ones or just redirect to national)
-    js_content = js_content.replace("`/api/search?q=${encodeURIComponent(query)}`", "`/api/latest-year.json`") # Mock
+    # --- URL Rewrites for Static JSON files ---
     
-    # General API calls
-    js_content = js_content.replace("fetch('/api/", "fetch('api/")
-    js_content = js_content.replace("fetch('/api/hotlines')", "fetch('api/hotlines.json')")
-    js_content = js_content.replace("fetch('/api/trends')", "fetch('api/trends.json')")
-    js_content = js_content.replace("fetch('/api/indicator-summary')", "fetch('api/indicator-summary.json')")
-    js_content = js_content.replace("fetch('/api/data-info')", "fetch('api/data-info.json')")
-    js_content = js_content.replace("fetch('/api/latest-year')", "fetch('api/latest-year.json')")
-    js_content = js_content.replace("fetch('/api/metrics-by-grade?indicator=우울감')", "fetch('api/metrics-by-grade_우울감.json')")
-    js_content = js_content.replace("fetch('/api/prediction/indicators')", "fetch('api/prediction/indicators.json')")
-    js_content = js_content.replace("fetch('/api/prediction/regions')", "fetch('api/prediction/regions.json')")
+    # Dynamic path rewrites (template string patterns)
+    js_content = js_content.replace(
+        "`/api/facilities?sido=${state.currentSido}`",
+        "`api/facilities_${state.currentSido}.json`"
+    )
+    js_content = js_content.replace(
+        "`/api/metrics?sido=${state.currentSido}`",
+        "`api/metrics_${state.currentSido}.json`"
+    )
+    js_content = js_content.replace(
+        "`/api/coords?sido=${sido}`",
+        "`api/coords_${sido}.json`"
+    )
     
-    # Prediction data fetch (Hardcode current selection)
-    js_content = js_content.replace("`/api/prediction/data?indicator=${indicator}&region=${region}&model_type=${modelType}&forecast_years=${horizon}`", "`/api/prediction/data_default.json`".replace("$", "${"))
+    # Prediction data: map to pre-generated static files per indicator+region+model
+    # Original: `/api/prediction/data?indicator=${indicator}&region=${region}&forecast_years=${horizon}&model_type=${model}`
+    # Replaced: `api/prediction/data_${indicator}_${region}_${model}.json`
+    js_content = js_content.replace(
+        "`/api/prediction/data?indicator=${encodeURIComponent(indicator)}&region=${encodeURIComponent(region)}&forecast_years=${horizon}&model_type=${model}`",
+        "`api/prediction/data_${indicator}_${region}_${model}.json`"
+    )
+    # Decomposition:
+    js_content = js_content.replace(
+        "`/api/prediction/decompose?indicator=${encodeURIComponent(indicator)}&region=${encodeURIComponent(region)}`",
+        "`api/prediction/decompose_${indicator}_${region}.json`"
+    )
+    
+    # Single static endpoint replacements
+    replacements = {
+        "fetch('/api/hotlines')": "fetch('api/hotlines.json')",
+        "fetch('/api/trends')": "fetch('api/trends.json')",
+        "fetch('/api/indicator-summary')": "fetch('api/indicator-summary.json')",
+        "fetch('/api/data-info')": "fetch('api/data-info.json')",
+        "fetch('/api/latest-year')": "fetch('api/latest-year.json')",
+        "fetch('/api/metrics-by-grade?indicator=우울감')": "fetch('api/metrics-by-grade_우울감.json')",
+        "fetch('/api/prediction/indicators')": "fetch('api/prediction/indicators.json')",
+        "fetch('/api/prediction/regions')": "fetch('api/prediction/regions.json')",
+        # search is not really implemented in static, mock it
+        "`/api/search?q=${encodeURIComponent(query)}`": "'api/latest-year.json'",
+        # Risk zones
+        "fetch('/api/risk-zones')": "fetch('api/latest-year.json')",
+    }
+    for old, new in replacements.items():
+        js_content = js_content.replace(old, new)
 
     with open(os.path.join(static_target, "app.js"), "w", encoding="utf-8") as f:
         f.write(js_content)
+    print("  ✓ app.js rewritten for static hosting")
 
-    # 4. Generate API Data
-    print("--- Generating API JSON files ---")
+    # 4. Generate basic API JSON data
+    print("--- Generating basic API JSON files ---")
     
-    # List of endpoints to pre-save
-    json_endpoints = [
+    basic_endpoints = [
         ("hotlines", "api/hotlines.json"),
         ("trends", "api/trends.json"),
         ("indicator-summary", "api/indicator-summary.json"),
@@ -101,39 +138,85 @@ def render():
         ("metrics-by-grade?indicator=우울감", "api/metrics-by-grade_우울감.json"),
         ("prediction/indicators", "api/prediction/indicators.json"),
         ("prediction/regions", "api/prediction/regions.json"),
-        # Default prediction data
-        ("prediction/data?indicator=스트레스&region=전국&model_type=LSTM&forecast_years=5", "api/prediction/data_default.json")
     ]
 
-    for endpoint, save_path in json_endpoints:
+    for endpoint, save_path in basic_endpoints:
         res = client.get(f"/api/{endpoint}")
         if res.status_code == 200:
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(res.json(), f, ensure_ascii=False)
+            print(f"  ✓ {save_path}")
         else:
-            print(f"Failed to fetch {endpoint}: {res.status_code}")
+            print(f"  ✗ Failed to fetch {endpoint}: {res.status_code}")
 
-    # Sido-specific data
+    # 5. Generate sido-specific data
+    print("--- Generating sido-specific JSON files ---")
     for sido in SIDO_MAP.keys():
-        # Facilities
-        res = client.get(f"/api/facilities?sido={sido}")
-        if res.status_code == 200:
-            with open(f"api/facilities_{sido}.json", "w", encoding="utf-8") as f:
-                json.dump(res.json(), f, ensure_ascii=False)
-        
-        # Metrics
-        res = client.get(f"/api/metrics?sido={sido}")
-        if res.status_code == 200:
-            with open(f"api/metrics_{sido}.json", "w", encoding="utf-8") as f:
-                json.dump(res.json(), f, ensure_ascii=False)
+        for endpoint, fname in [
+            (f"facilities?sido={sido}", f"api/facilities_{sido}.json"),
+            (f"metrics?sido={sido}", f"api/metrics_{sido}.json"),
+            (f"coords?sido={sido}", f"api/coords_{sido}.json"),
+        ]:
+            res = client.get(f"/api/{endpoint}")
+            if res.status_code == 200:
+                with open(fname, "w", encoding="utf-8") as f:
+                    json.dump(res.json(), f, ensure_ascii=False)
+    print(f"  ✓ {len(SIDO_MAP)} regions × 3 files generated")
 
-        # Coords
-        res = client.get(f"/api/coords?sido={sido}")
-        if res.status_code == 200:
-            with open(f"api/coords_{sido}.json", "w", encoding="utf-8") as f:
-                json.dump(res.json(), f, ensure_ascii=False)
+    # 6. Generate ALL prediction data files (indicator × region × model)
+    print("--- Generating prediction JSON files (all combinations) ---")
+    total = len(INDICATORS) * len(REGIONS) * len(MODELS)
+    count = 0
+    errors = []
+    
+    for indicator in INDICATORS:
+        for region in REGIONS:
+            for model in MODELS:
+                endpoint = f"prediction/data?indicator={indicator}&region={region}&model_type={model}&forecast_years={FORECAST_YEARS}"
+                res = client.get(f"/api/{endpoint}")
+                
+                # Filename matches what app.js will request:
+                # `api/prediction/data_${indicator}_${region}_${model}.json`
+                fname = f"api/prediction/data_{indicator}_{region}_{model}.json"
+                
+                if res.status_code == 200:
+                    with open(fname, "w", encoding="utf-8") as f:
+                        json.dump(res.json(), f, ensure_ascii=False)
+                    count += 1
+                else:
+                    errors.append(f"{indicator}/{region}/{model}: {res.status_code}")
+                    # Write an error JSON so the frontend shows a helpful message
+                    with open(fname, "w", encoding="utf-8") as f:
+                        json.dump({"error": f"'{region}'의 '{indicator}' 예측 데이터가 없습니다."}, f, ensure_ascii=False)
 
-    print("✅ Static site ready for GitHub Pages!")
+    print(f"  ✓ {count}/{total} prediction files generated")
+    if errors:
+        print(f"  ℹ {len(errors)} combinations had no data (error stubs saved):")
+        for e in errors[:10]:
+            print(f"    - {e}")
+
+    # 7. Generate decomposition files
+    print("--- Generating decomposition JSON files ---")
+    decomp_count = 0
+    for indicator in INDICATORS:
+        for region in REGIONS:
+            endpoint = f"prediction/decompose?indicator={indicator}&region={region}"
+            res = client.get(f"/api/{endpoint}")
+            fname = f"api/prediction/decompose_{indicator}_{region}.json"
+            
+            if res.status_code == 200:
+                with open(fname, "w", encoding="utf-8") as f:
+                    json.dump(res.json(), f, ensure_ascii=False)
+                decomp_count += 1
+            else:
+                # Write error stub
+                with open(fname, "w", encoding="utf-8") as f:
+                    json.dump({"error": "분해 데이터 없음"}, f, ensure_ascii=False)
+
+    print(f"  ✓ {decomp_count}/{len(INDICATORS)*len(REGIONS)} decomposition files generated")
+
+    print("\n✅ Static site ready for GitHub Pages!")
+    print(f"   Generated {count} prediction + {decomp_count} decomposition JSON files")
 
 if __name__ == "__main__":
     render()
