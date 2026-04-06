@@ -259,7 +259,7 @@ async function fetchMetrics() {
 }
 
 async function fetchTrends() {
-    const res = await fetch(`/api/trends`);
+    const res = await fetch('api/trends.json');
     state.data.trends = await res.json();
 }
 
@@ -828,7 +828,7 @@ async function updatePrediction() {
     btn.disabled = true;
 
     try {
-        const res = await fetch(`/api/prediction/data?indicator=${indicator}&region=${region}&forecast_years=${horizon}&model_type=${model}`);
+        const res = await fetch(`api/prediction/data_${indicator}_${region}_${model}.json`);
         const data = await res.json();
         
         if (data.error) {
@@ -987,7 +987,7 @@ function renderPredictionChart(data, modelName) {
 
 async function fetchDecomposition(indicator, region) {
     try {
-        const res = await fetch(`/api/prediction/decompose?indicator=${indicator}&region=${region}`);
+        const res = await fetch(`api/prediction/decompose_${indicator}_${region}.json`);
         const data = await res.json();
         if (data.error) return;
         
@@ -1058,9 +1058,8 @@ async function toggleRiskLayer() {
         return;
     }
 
-    const res = await fetch('api/latest-year.json');
-    const points = await res.json();
-    renderRiskPoints(points);
+    // Static site: no backend → render empty (no reported risk zones)
+    renderRiskPoints([]);
 }
 
 function renderRiskPoints(points) {
@@ -1169,20 +1168,8 @@ async function handleRoutePick(e) {
 }
 
 async function checkPointDanger(lat, lon, label) {
-    const res = await fetch('api/latest-year.json');
-    const riskZones = await res.json();
-    
-    // Find closest risk zone
-    let found = false;
-    riskZones.forEach(zone => {
-        if (zone.type === 'report' || zone.intensity > 40) {
-            const dist = getDistance(lat, lon, zone.lat, zone.lon);
-            if (dist < 0.5) { // within 500m
-                alert(`⚠️ 주의: ${label} 주변에 위험 지역 제보가 있습니다.\n- 내용: ${zone.content || '높은 스트레스/위험 지수'}`);
-                found = true;
-            }
-        }
-    });
+    // Static site mode: no live risk zone data available
+    // (Real-time reporting requires Firebase backend)
 }
 
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -1232,19 +1219,42 @@ async function findSafeRoute() {
     
     if (!startQ || !endQ) return alert("출발지와 도착지를 입력하세요.");
 
-    const resStart = await fetch(`/api/search?q=${encodeURIComponent(startQ)}`);
-    const { coords: startRaw } = await resStart.json();
+    // Static site: geocode via Mapbox Geocoding API directly (no backend)
+    const resultEl = document.getElementById('route-result');
+    resultEl.innerHTML = '<p style="color:var(--text-secondary)">🔍 경로 탐색 중...</p>';
 
-    const resEnd = await fetch(`/api/search?q=${encodeURIComponent(endQ)}`);
-    const { coords: endRaw } = await resEnd.json();
+    async function geocode(query) {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=kr&language=ko&access_token=${MAPBOX_TOKEN}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+            const [lng, lat] = data.features[0].center;
+            return [lat, lng];
+        }
+        return null;
+    }
 
-    // Use dataset coords if available (from map pick), otherwise from search
-    const startLat = document.getElementById('route-start').dataset.lat || startRaw[0];
-    const startLon = document.getElementById('route-start').dataset.lon || startRaw[1];
-    const endLat = document.getElementById('route-end').dataset.lat || endRaw[0];
-    const endLon = document.getElementById('route-end').dataset.lon || endRaw[1];
+    // Use dataset coords if already set from map pick, otherwise geocode
+    const startEl = document.getElementById('route-start');
+    const endEl = document.getElementById('route-end');
 
-    const routeRes = await fetch(`/api/safe-route?start_lat=${startLat}&start_lon=${startLon}&end_lat=${endLat}&end_lon=${endLon}`);
+    let startRaw = startEl.dataset.lat ? [parseFloat(startEl.dataset.lat), parseFloat(startEl.dataset.lon)] : await geocode(startQ);
+    let endRaw = endEl.dataset.lat ? [parseFloat(endEl.dataset.lat), parseFloat(endEl.dataset.lon)] : await geocode(endQ);
+
+    if (!startRaw || !endRaw) {
+        resultEl.innerHTML = '<p style="color:#f43f5e">❌ 주소를 찾을 수 없습니다. 더 구체적인 주소를 입력해주세요.</p>';
+        return;
+    }
+
+    // Coords already resolved above — use them directly
+    const startLat = startRaw[0];
+    const startLon = startRaw[1];
+    const endLat = endRaw[0];
+    const endLon = endRaw[1];
+
+    // Call Mapbox Directions API directly (no backend needed)
+    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/walking/${startLon},${startLat};${endLon},${endLat}?alternatives=true&geometries=geojson&steps=true&language=ko&access_token=${MAPBOX_TOKEN}`;
+    const routeRes = await fetch(directionsUrl);
     const data = await routeRes.json();
 
     if (data.routes && data.routes.length > 0) {
