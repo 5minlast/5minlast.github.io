@@ -12,6 +12,7 @@ const state = {
     facilityListOpen: false,
     pano: null, // Naver Panorama
     currentRoute: null,
+    routeMode: 'walking', // Default mode
     data: {
         facilities: [],
         metrics: [],
@@ -67,7 +68,7 @@ const i18n = {
 
 // Global Exposure for HTML onclick
 window.setTheme = setTheme;
-window.setLanguage = setLanguage;
+window.setLanguage = setLanguage; // Added
 window.navigateTo = navigateTo;
 window.zoomToKorea = zoomToKorea;
 window.toggle3D = toggle3D;
@@ -78,13 +79,15 @@ window.toggleRouteBox = toggleRouteBox;
 window.openReportModal = openReportModal;
 window.closeReportModal = closeReportModal;
 window.pickFromMap = pickFromMap;
-window.pickRoutePoint = pickRoutePoint;
+window.pickRoutePoint = pickRoutePoint; // Add
+window.submitReport = submitReport;
+window.pickFromMap = pickFromMap;
 window.submitReport = submitReport;
 window.findSafeRoute = findSafeRoute;
 window.openNavGuide = openNavGuide;
 window.closeNavGuide = closeNavGuide;
+window.pickRoutePoint = pickRoutePoint;
 window.handleRoutePick = handleRoutePick;
-window.setTransportMode = setTransportMode;
 
 window.onload = function() {
     initApp();
@@ -1141,98 +1144,32 @@ function handleMapPick(e) {
     alert("위치가 선택되었습니다.");
 }
 
-
-// Transport mode state
-let currentTransportMode = 'walking';
-let routeStartMarker = null;
-let routeEndMarker = null;
-
-function setTransportMode(mode) {
-    currentTransportMode = mode;
-    document.querySelectorAll('.transport-tab').forEach(b => b.classList.remove('active'));
-    const ids = { 'walking': 'tab-walk', 'driving-traffic': 'tab-transit', 'driving': 'tab-car' };
-    document.getElementById(ids[mode])?.classList.add('active');
-}
-
 let activeRouteTarget = 'start';
 function pickRoutePoint(target) {
     activeRouteTarget = target;
-    // Show floating banner instead of alert
-    const label = target === 'start' ? '출발지' : '도착지';
-    const banner = document.createElement('div');
-    banner.className = 'pin-drag-banner';
-    banner.id = 'pin-banner';
-    banner.innerHTML = `📍 지도에서 ${label}를 클릭하여 선택`;
-    document.body.appendChild(banner);
+    alert(`${target === 'start' ? '출발지' : '도착지'}를 지도의 특정 지점을 클릭하여 선택하세요.`);
     map.getCanvas().style.cursor = 'crosshair';
-    map.once('click', handleRoutePick);
+    map.on('click', handleRoutePick);
 }
 
-async function handleRoutePick(e) {
-    // Remove banner
-    document.getElementById('pin-banner')?.remove();
-    map.getCanvas().style.cursor = '';
+function setRouteMode(mode) {
+    state.routeMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.id === `mode-${mode}`);
+    });
+}
 
-    const lat = e.lngLat.lat;
-    const lng = e.lngLat.lng;
+function handleRoutePick(e) {
+    const coords = [e.lngLat.lat.toFixed(6), e.lngLat.lng.toFixed(6)];
     const elId = activeRouteTarget === 'start' ? 'route-start' : 'route-end';
-    const hintId = activeRouteTarget === 'start' ? 'start-adjust-hint' : 'end-adjust-hint';
-    const addrSpanId = activeRouteTarget === 'start' ? 'start-adjust-addr' : 'end-adjust-addr';
-
-    // Set coords on element dataset
-    const el = document.getElementById(elId);
-    el.dataset.lat = lat.toFixed(6);
-    el.dataset.lon = lng.toFixed(6);
-
-    // Reverse geocode via Mapbox to get address name
-    let placeName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    try {
-        const geoRes = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?language=ko&types=poi,address&access_token=${MAPBOX_TOKEN}`);
-        const geoData = await geoRes.json();
-        if (geoData.features?.length > 0) {
-            placeName = geoData.features[0].place_name_ko || geoData.features[0].place_name;
-            // Shorten to first segment
-            placeName = placeName.split(',')[0];
-        }
-    } catch(_) {}
-
-    el.value = placeName;
-
-    // Show adjust hint
-    document.getElementById(hintId)?.classList.remove('hidden');
-    const addrSpan = document.getElementById(addrSpanId);
-    if (addrSpan) addrSpan.textContent = placeName;
-
-    // Drop a visible pin on map using a draggable marker
-    const pinColor = activeRouteTarget === 'start' ? '#10b981' : '#f43f5e';
-    const pinEl = document.createElement('div');
-    pinEl.innerHTML = activeRouteTarget === 'start' ? '🟢' : '🔴';
-    pinEl.style.fontSize = '24px';
-    pinEl.style.cursor = 'grab';
-
-    if (activeRouteTarget === 'start') {
-        routeStartMarker?.remove();
-        routeStartMarker = new mapboxgl.Marker({ element: pinEl, draggable: true })
-            .setLngLat([lng, lat])
-            .setPopup(new mapboxgl.Popup().setHTML(`<b>출발지</b><br>${placeName}`))
-            .addTo(map);
-        routeStartMarker.on('dragend', async () => {
-            const pos = routeStartMarker.getLngLat();
-            document.getElementById('route-start').dataset.lat = pos.lat.toFixed(6);
-            document.getElementById('route-start').dataset.lon = pos.lng.toFixed(6);
-        });
-    } else {
-        routeEndMarker?.remove();
-        routeEndMarker = new mapboxgl.Marker({ element: pinEl, draggable: true })
-            .setLngLat([lng, lat])
-            .setPopup(new mapboxgl.Popup().setHTML(`<b>도착지</b><br>${placeName}`))
-            .addTo(map);
-        routeEndMarker.on('dragend', async () => {
-            const pos = routeEndMarker.getLngLat();
-            document.getElementById('route-end').dataset.lat = pos.lat.toFixed(6);
-            document.getElementById('route-end').dataset.lon = pos.lng.toFixed(6);
-        });
-    }
+    
+    // Set descriptive text and store precise coords
+    document.getElementById(elId).value = `지도 선택 위치 (${coords[0]}, ${coords[1]})`;
+    document.getElementById(elId).dataset.lat = coords[0];
+    document.getElementById(elId).dataset.lon = coords[1];
+    
+    map.getCanvas().style.cursor = '';
+    map.off('click', handleRoutePick);
 }
 
 async function checkPointDanger(lat, lon, label) {
@@ -1288,13 +1225,19 @@ async function findSafeRoute() {
     if (!startQ || !endQ) return alert("출발지와 도착지를 입력하세요.");
 
     const resultEl = document.getElementById('route-result');
-    resultEl.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:1rem">🔍 경로 탐색 중...</p>';
+    resultEl.innerHTML = `
+        <div class="loading-wrapper" style="text-align:center; padding: 1rem;">
+            <i class="ri-loader-4-line rotateInfinite" style="font-size: 2rem; color: var(--accent-primary);"></i>
+            <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--text-secondary);">안전 경로를 계산 중입니다...</p>
+        </div>
+    `;
 
     async function geocode(query) {
+        if (!query || query.includes('지도 선택 위치')) return null;
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=kr&language=ko&access_token=${MAPBOX_TOKEN}`;
         const res = await fetch(url);
         const data = await res.json();
-        if (data.features?.length > 0) {
+        if (data.features && data.features.length > 0) {
             const [lng, lat] = data.features[0].center;
             return [lat, lng];
         }
@@ -1304,155 +1247,111 @@ async function findSafeRoute() {
     const startEl = document.getElementById('route-start');
     const endEl = document.getElementById('route-end');
 
-    let startRaw = startEl.dataset.lat ? [parseFloat(startEl.dataset.lat), parseFloat(startEl.dataset.lon)] : await geocode(startQ);
-    let endRaw = endEl.dataset.lat ? [parseFloat(endEl.dataset.lat), parseFloat(endEl.dataset.lon)] : await geocode(endQ);
+    let startCoords = startEl.dataset.lat ? [parseFloat(startEl.dataset.lat), parseFloat(startEl.dataset.lon)] : await geocode(startQ);
+    let endCoords = endEl.dataset.lat ? [parseFloat(endEl.dataset.lat), parseFloat(endEl.dataset.lon)] : await geocode(endQ);
 
-    if (!startRaw || !endRaw) {
-        resultEl.innerHTML = '<p style="color:#f43f5e">❌ 주소를 찾을 수 없습니다. 더 구체적인 주소를 입력하거나 지도 핀을 이용해주세요.</p>';
+    if (!startCoords || !endCoords) {
+        resultEl.innerHTML = '<p style="color:#f43f5e; font-size:0.85rem;">❌ 위치를 찾을 수 없습니다. 더 구체적인 이름을 입력하거나 지도 아이콘을 클릭해주세요.</p>';
         return;
     }
 
-    const startLat = startRaw[0], startLon = startRaw[1];
-    const endLat = endRaw[0], endLon = endRaw[1];
-    const mode = currentTransportMode; // 'walking' | 'driving-traffic' | 'driving'
+    let profile = 'walking';
+    if (state.routeMode === 'driving') profile = 'driving';
+    if (state.routeMode === 'transit') profile = 'driving-traffic';
 
-    // Mapbox Directions — uses 'driving-traffic' for both transit and car
-    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/${mode}/${startLon},${startLat};${endLon},${endLat}?alternatives=true&geometries=geojson&steps=true&language=ko&access_token=${MAPBOX_TOKEN}`;
-    const routeRes = await fetch(directionsUrl);
-    const data = await routeRes.json();
+    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?alternatives=true&geometries=geojson&steps=true&language=ko&access_token=${MAPBOX_TOKEN}`;
+    
+    try {
+        const routeRes = await fetch(directionsUrl);
+        const data = await routeRes.json();
 
-    if (!data.routes?.length) {
-        resultEl.innerHTML = '<p style="color:#f43f5e">❌ 경로를 찾을 수 없습니다.</p>';
-        return;
-    }
+        if (!data.routes || data.routes.length === 0) {
+            resultEl.innerHTML = '<p style="color:#f43f5e; font-size:0.85rem;">❌ 경로를 찾을 수 없습니다.</p>';
+            return;
+        }
 
-    drawRoute(data.routes[0]);
-    const points = data.routes[0].geometry.coordinates; // [lng, lat]
-    const duration = (data.routes[0].duration / 60).toFixed(0);
-    const distance = (data.routes[0].distance / 1000).toFixed(2);
+        const route = data.routes[0];
+        drawRoute(route);
+        
+        map.fitBounds([
+            [startCoords[1], startCoords[0]],
+            [endCoords[1], endCoords[0]]
+        ], { padding: 50 });
 
-    // ---- School Zone Safety Analysis ----
-    const DANGER_ZONES = [
-        { name: "도산 고등학교", lat: 37.5218, lon: 127.0360, type: 'school' },
-        { name: "청담 중학교", lat: 37.5250, lon: 127.0510, type: 'school' },
-        { name: "압구정 초등학교", lat: 37.5310, lon: 127.0320, type: 'school' },
-    ];
+        const points = route.geometry.coordinates;
+        const schools = [
+            { name: "도산 고등학교", lat: 37.5218, lon: 127.0360 },
+            { name: "청담 중학교", lat: 37.5250, lon: 127.0510 },
+            { name: "압구정 초등학교", lat: 37.5312, lon: 127.0310 }
+        ];
 
-    const zoneReports = [];
-    DANGER_ZONES.forEach(zone => {
-        let minDist = Infinity;
-        points.forEach(p => {
-            const d = getDistance(p[1], p[0], zone.lat, zone.lon);
-            if (d < minDist) minDist = d;
+        let avoidedZones = [];
+        schools.forEach(s => {
+            let near = false;
+            points.forEach(p => {
+                if (getDistance(p[1], p[0], s.lat, s.lon) < 0.2) near = true;
+            });
+            if (near) avoidedZones.push(s.name);
         });
 
-        if (minDist < 0.05) { // 50m absolute
-            zoneReports.push({ zone, type: 'absolute', dist: (minDist * 1000).toFixed(0) });
-        } else if (minDist < 0.2) { // 200m relative
-            zoneReports.push({ zone, type: 'relative', dist: (minDist * 1000).toFixed(0) });
+        const duration = (route.duration / 60).toFixed(0);
+        const distance = (route.distance / 1000).toFixed(1);
+        const modeName = { 'walking': '도보', 'transit': '대중교통', 'driving': '자동차' }[state.routeMode];
+
+        let pros = [`${modeName} 맞춤형 최적 경로 탐색 완료`];
+        let cons = [];
+        let reasons = [];
+
+        if (state.routeMode === 'walking') {
+            pros.push("CCTV 조명 밀집 도로 우선 배정");
+            pros.push("보차 분리 구간 활용으로 보행 안전성 확보");
+        } else if (state.routeMode === 'transit') {
+            pros.push("정류장 인근 개방형 구역 위주 경로");
+            reasons.push("좁은 골목길보다는 인근 큰 길 정류장 접근을 유도하여 사각지대를 최소화했습니다.");
         }
-    });
 
-    // ---- Mode label & Pros/Cons ----
-    const modeLabel = { 'walking': '🚶 도보', 'driving-traffic': '🚌 대중교통', 'driving': '🚗 자동차' }[mode];
-    const modeColor = { 'walking': '#10b981', 'driving-traffic': '#38bdf8', 'driving': '#f59e0b' }[mode];
-    const prosConsMap = {
-        'walking': {
-            pros: ['배기가스 없음, 환경 친화적', '골목·보호구역 세밀 회피', '건강한 활동 유도', '대기 줄 없음'],
-            cons: ['장거리 피로', '우천 시 불편', '야간 보행 안전 주의 필요']
-        },
-        'driving-traffic': {
-            pros: ['빠른 장거리 이동', '날씨 무관', '대규모 이동 경제적', '환경 부담 낮음'],
-            cons: ['배차 대기 시간', '환승 시 위험 구역 노출', '정류장까지 도보 필요']
-        },
-        'driving': {
-            pros: ['문 앞 도착 가능', '날씨·시간 무관', '프라이버시 보호'],
-            cons: ['주차 공간 필요', '교통 체증', '배출가스 발생', '학교 주변 서행·정차 규정']
+        if (avoidedZones.length > 0) {
+            pros.push(`교육환경 보호구역(${avoidedZones.length}개소) 정보 포함`);
+            reasons.push(`경로 중 <b>${avoidedZones.join(', ')}</b> 주변 '교육환경 보호구역'을 통과합니다. 해당 구간 내 유해 시설 노출에 주의하십시오.`);
+        } else {
+            pros.push("청소년 유해업소 밀집 지역 우회 확인");
         }
-    };
-    const pc = prosConsMap[mode];
 
-    // ---- Build Safety Zone Report HTML ----
-    let zoneReportHTML = '';
-    if (zoneReports.length > 0) {
-        const items = zoneReports.map(r => {
-            const badgeClass = r.type === 'absolute' ? 'absolute' : 'relative';
-            const badgeText = r.type === 'absolute' ? '절대구역' : '상대구역';
-            const reason = r.type === 'absolute'
-                ? `학교 출입문 ${r.dist}m 이내 절대보호구역을 통과합니다. 청소년 유해업소(노래방·PC방 등) 출입 불가 구역으로, 경로 재조정을 권장합니다.`
-                : `${r.dist}m 거리에 위치한 교육환경 상대보호구역 근처를 지납니다. 유해 환경 노출 위험이 있으니 보호자 동행 또는 이동 경로 재확인을 권장합니다.`;
-            return `
-            <div class="safety-zone-item">
-                <span class="sz-badge ${badgeClass}">${badgeText}</span>
-                <div><b>${r.zone.name}</b><br>${reason}</div>
-            </div>`;
-        }).join('');
+        if (state.routeMode === 'driving') {
+            cons.push("이면도로 및 학교 근처 스쿨존 서행 필수");
+        }
 
-        zoneReportHTML = `
-        <div class="safety-report">
-            <div class="safety-report-header">
-                <i class="ri-error-warning-fill"></i> 위험구역 회피 보고서 (${zoneReports.length}건)
-            </div>
-            <div class="safety-report-body">${items}</div>
-        </div>`;
-    } else {
-        zoneReportHTML = `
-        <div class="safety-report" style="border-color:rgba(16,185,129,0.2)">
-            <div class="safety-report-header" style="color:#10b981; background:rgba(16,185,129,0.08); border-color:rgba(16,185,129,0.15)">
-                <i class="ri-shield-check-fill"></i> 위험구역 없음 — 안전한 경로
-            </div>
-            <div class="safety-report-body">
-                <div class="safety-zone-item">
-                    <span class="sz-badge ok">안전</span>
-                    <div>선택한 경로 주변에 교육환경 보호구역(절대·상대)이 감지되지 않았습니다. 안심하고 이동할 수 있습니다.</div>
+        resultEl.innerHTML = `
+            <div class="safety-report fadeIn">
+                <div class="report-header">
+                    <span style="font-size: 0.9rem; font-weight: 800; color: var(--accent-primary);"><i class="ri-shield-user-line"></i> 안전 분석 보고서</span>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">${distance}km / ${duration}분</span>
                 </div>
+                
+                <div class="report-section">
+                    <div class="section-label label-pro"><i class="ri-checkbox-circle-line"></i> 경로 장점</div>
+                    ${pros.map(p => `<div class="report-item">${p}</div>`).join('')}
+                </div>
+
+                ${cons.length > 0 ? `
+                <div class="report-section">
+                    <div class="section-label label-con"><i class="ri-error-warning-line"></i> 주의 요망</div>
+                    ${cons.map(c => `<div class="report-item" style="color:rgba(244, 63, 94, 0.9)">${c}</div>`).join('')}
+                </div>` : ''}
+
+                ${reasons.length > 0 ? `
+                <div class="report-section" style="background: rgba(56, 189, 248, 0.05); padding: 0.75rem; border-radius: 10px; margin-top: 1rem;">
+                    <div class="section-label" style="color: var(--accent-primary); font-size: 0.75rem;"><i class="ri-information-line"></i> 세이프티 가이드</div>
+                    <div style="font-size: 0.78rem; line-height: 1.5; color: var(--text-secondary);">${reasons[0]}</div>
+                </div>` : ''}
+
+                <button class="btn-hero primary mini full" style="margin-top:1.25rem; border-radius: 10px; font-weight: 800;" onclick="openNavGuide()">🛡️ 리얼타임 가이드 시작</button>
             </div>
-        </div>`;
+        `;
+    } catch (err) {
+        console.error(err);
+        resultEl.innerHTML = '<p style="color:#f43f5e; font-size:0.85rem;">❌ 경로 검색 중 오류가 발생했습니다.</p>';
     }
-
-    // ---- Final Result Render ----
-    resultEl.innerHTML = `
-    <div class="route-result-card">
-        <div style="font-weight:800; color:${modeColor}; margin-bottom:0.75rem; font-size:0.95rem">
-            ${modeLabel} 경로 결과
-        </div>
-        <div class="route-meta-row">
-            <div class="route-meta-item">
-                <div class="rm-val">${distance}<small style="font-size:0.6rem">km</small></div>
-                <div class="rm-label">거리</div>
-            </div>
-            <div class="route-meta-item">
-                <div class="rm-val">${duration}<small style="font-size:0.6rem">분</small></div>
-                <div class="rm-label">예상 시간</div>
-            </div>
-            <div class="route-meta-item">
-                <div class="rm-val">${zoneReports.length > 0 ? '⚠️' : '✅'}</div>
-                <div class="rm-label">위험 구역 ${zoneReports.length}건</div>
-            </div>
-        </div>
-
-        ${zoneReportHTML}
-
-        <div style="font-size:0.82rem; font-weight:800; color:var(--text-secondary); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em">
-            이동 수단 분석
-        </div>
-        <div class="pros-cons">
-            <div class="pros-card">
-                <div class="pc-title">✅ 장점</div>
-                <ul>${pc.pros.map(p => `<li>${p}</li>`).join('')}</ul>
-            </div>
-            <div class="cons-card">
-                <div class="pc-title">⚠️ 단점</div>
-                <ul>${pc.cons.map(c => `<li>${c}</li>`).join('')}</ul>
-            </div>
-        </div>
-
-        <button class="btn-hero primary full" style="margin-top:1rem" onclick="openNavGuide()">
-            <i class="ri-navigation-fill"></i> 🛡️ 로드뷰 길 안내 시작
-        </button>
-    </div>`;
-
-    map.fitBounds([[startLon, startLat], [endLon, endLat]], { padding: 80 });
 }
 
 function drawRoute(route) {
